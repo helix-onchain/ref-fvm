@@ -13,7 +13,7 @@ use fvm_ipld_encoding::CborStore;
 use itertools::sorted;
 
 use super::ValueMut;
-use crate::node::{CollapsedNode, Link};
+use crate::node::{CollapsedNode, IterationStats, Link};
 use crate::root::version::{Version as AmtVersion, V0, V3};
 use crate::root::RootImpl;
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
 #[derive(Debug)]
 #[doc(hidden)]
 pub struct AmtImpl<V, BS, Ver> {
-    root: RootImpl<V, Ver>,
+    pub root: RootImpl<V, Ver>,
     block_store: BS,
     /// Remember the last flushed CID until it changes.
     flushed_cid: Option<Cid>,
@@ -185,6 +185,12 @@ where
         }
 
         while i >= nodes_for_height(self.bit_width(), self.height() + 1) {
+            // FIXME: remove debugging
+            let bit_width = self.bit_width();
+            let height = self.height();
+            let nodes_for_height = nodes_for_height(bit_width, height + 1);
+            println!("Amt setting {i:?}. nodes_for_height({bit_width:?}, {height:?} + 1) = {nodes_for_height:?})");
+
             // node at index exists
             if !self.root.node.is_empty() {
                 // Parent node for expansion
@@ -363,6 +369,33 @@ where
             f(i, x)?;
             Ok(true)
         })
+    }
+
+    /// Iterates over each value in the Amt between the start and end indices, and runs a function
+    /// on the values, for as long as that function keeps returning `true`.
+    ///
+    /// Returns a link to the last index that was explored
+    pub fn for_range_while<F>(
+        &self,
+        start_index: u64,
+        end_index: u64,
+        mut f: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(u64, &V, IterationStats) -> anyhow::Result<bool>,
+    {
+        self.root
+            .node
+            .for_range_while(
+                &self.block_store,
+                start_index,
+                end_index,
+                self.height(),
+                self.bit_width(),
+                0,
+                &mut f,
+            )
+            .map(|_| ())
     }
 
     /// Iterates over each value in the Amt and runs a function on the values, for as long as that

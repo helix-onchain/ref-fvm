@@ -16,9 +16,14 @@ use serde::{ser, Deserialize, Serialize};
 use super::ValueMut;
 use crate::{bmap_bytes, init_sized_vec, nodes_for_height, Error};
 
+#[derive(Debug)]
+pub struct IterationStats {
+    pub height: u32,
+}
+
 /// This represents a link to another Node
 #[derive(Debug)]
-pub(super) enum Link<V> {
+pub enum Link<V> {
     /// Unchanged link to data with an atomic cache.
     Cid {
         cid: Cid,
@@ -71,7 +76,7 @@ impl<V> From<Cid> for Link<V> {
 /// Node represents either a shard of values in the form of bytes or links to other nodes
 #[derive(PartialEq, Eq, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub(super) enum Node<V> {
+pub enum Node<V> {
     /// Node is a link node, contains array of Cid or cached sub nodes.
     Link { links: Vec<Option<Link<V>>> },
     /// Leaf node, this array contains only values.
@@ -289,6 +294,9 @@ where
         // If dividing by nodes for height should give an index for link in node
         let idx: usize = (i / nfh).try_into().expect("index overflow");
 
+        // FIMXE: remove debugging
+        println!("Node setting {i:?}. nodes_for_height({bit_width:?}, {height:?})  = {nfh:?})");
+
         if let Node::Link { links } = self {
             links[idx] = match &mut links[idx] {
                 Some(Link::Cid { cid, cache }) => {
@@ -332,6 +340,8 @@ where
     }
 
     fn set_leaf(&mut self, i: u64, val: V) -> Option<V> {
+        // FIXME: remove debugging
+        println!("Leaf setting {i:?}");
         match self {
             Node::Leaf { vals } => {
                 let prev = std::mem::replace(
@@ -418,6 +428,98 @@ where
                 Ok(deleted)
             }
         }
+    }
+
+    pub(super) fn for_range_while<S, F>(
+        &self,
+        bs: &S,
+        start_index: u64,
+        end_index: u64,
+        height: u32,
+        bit_width: u32,
+        offset: u64,
+        f: &mut F,
+    ) -> Result<bool, Error>
+    where
+        F: FnMut(u64, &V, IterationStats) -> anyhow::Result<bool>,
+        S: Blockstore,
+    {
+        match self {
+            Node::Leaf { vals } => {
+                for (i, v) in (0..).zip(vals.iter()) {
+                    // filter out leaf values between start and end index
+                    let idx = offset + i;
+                    if idx < start_index {
+                        continue;
+                    } else if idx >= end_index {
+                        return Ok(true);
+                    }
+
+                    if let Some(v) = v {
+                        let keep_going = f(idx, v, IterationStats { height })?;
+
+                        if !keep_going {
+                            return Ok(false);
+                        }
+                    }
+                }
+            }
+            Node::Link { links } => {
+                let nfh = nodes_for_height(bit_width, height);
+                for (i, l) in (0..).zip(links.iter()) {
+                    let high_limit = offset + (i + 1) * nfh;
+                    // highest possible value the subtree contains is less than start_index
+                    if start_index >= high_limit {
+                        println!("Skipping too low");
+                        continue;
+                    }
+                    // end_index is exceeded by lowest value in the subtree
+                    if end_index < offset + i * nfh {
+                        println!("Ending too high");
+                        return Ok(true);
+                    }
+
+                    if let Some(l) = l {
+                        let offs = offset + (i * nodes_for_height(bit_width, height));
+                        let keep_going = match l {
+                            Link::Dirty(sub) => sub.for_range_while(
+                                bs,
+                                start_index,
+                                end_index,
+                                height - 1,
+                                bit_width,
+                                offs,
+                                f,
+                            )?,
+                            Link::Cid { cid, cache } => {
+                                let cached_node = cache.get_or_try_init(|| {
+                                    bs.get_cbor::<CollapsedNode<V>>(cid)?
+                                        .ok_or_else(|| Error::CidNotFound(cid.to_string()))?
+                                        .expand(bit_width)
+                                        .map(Box::new)
+                                })?;
+
+                                cached_node.for_range_while(
+                                    bs,
+                                    start_index,
+                                    end_index,
+                                    height - 1,
+                                    bit_width,
+                                    offs,
+                                    f,
+                                )?
+                            }
+                        };
+
+                        if !keep_going {
+                            return Ok(false);
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(true)
     }
 
     pub(super) fn for_each_while<S, F>(

@@ -30,7 +30,7 @@ pub(crate) mod version {
 }
 
 #[derive(PartialEq, Debug)]
-pub(crate) struct RootImpl<V, Ver> {
+pub struct RootImpl<V, Ver> {
     pub bit_width: u32,
     pub height: u32,
     pub count: u64,

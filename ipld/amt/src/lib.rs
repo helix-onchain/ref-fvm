@@ -15,7 +15,7 @@ mod value_mut;
 
 pub use self::amt::{Amt, Amtv0};
 pub use self::error::Error;
-pub(crate) use self::node::Node;
+pub use self::node::Node;
 pub use self::value_mut::ValueMut;
 
 const DEFAULT_BIT_WIDTH: u32 = 3;
@@ -25,7 +25,7 @@ const MAX_HEIGHT: u32 = 64;
 /// don't overflow u64::MAX when computing the length.
 pub const MAX_INDEX: u64 = (std::u64::MAX - 1) as u64;
 
-fn nodes_for_height(bit_width: u32, height: u32) -> u64 {
+pub fn nodes_for_height(bit_width: u32, height: u32) -> u64 {
     let height_log_two = bit_width as u64 * height as u64;
     if height_log_two >= 64 {
         return std::u64::MAX;
