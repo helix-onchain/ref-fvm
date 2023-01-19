@@ -492,3 +492,52 @@ fn ranged_iteration() {
     let expected: Vec<(usize, String)> = (100..200).map(|i| (i, format!("thing{i}"))).collect();
     assert_eq!(expected, restored);
 }
+
+#[test]
+fn ranged_iteration_benchmark() {
+    let memory_bs = MemoryBlockstore::default();
+    let array_cid = Amt::<String, _>::new_with_bit_width(&memory_bs, 2)
+        .flush()
+        .unwrap();
+
+    let mut array: Amt<String, &MemoryBlockstore> = Amt::load(&array_cid, &memory_bs).unwrap();
+
+    // construct a test AMT with a bunch of values
+    let vals: Vec<String> = (0..1000).map(|i| format!("item-{}", i)).collect();
+    array.batch_set(vals).unwrap();
+
+    let array_cid = array.flush().unwrap();
+
+    // read it up to a certain max block range
+    let bs1 = TrackingBlockstore::new(memory_bs.clone());
+    let array: Amt<String, &TrackingBlockstore<MemoryBlockstore>> =
+        Amt::load(&array_cid, &bs1).unwrap();
+    let mut retrieved_1: Vec<String> = Vec::new();
+    array
+        .for_range_while(0, 1000, |_i, f| {
+            retrieved_1.push(f.clone());
+            Ok(true)
+        })
+        .unwrap();
+    println!("{:#?}", bs1.stats);
+    assert_eq!(retrieved_1.len(), 1000);
+    println!("{:#?} {:#?}", retrieved_1[0], retrieved_1.last());
+
+    // read it with new method, limited blocks
+    let bs2 = TrackingBlockstore::new(memory_bs);
+    let array: Amt<String, &TrackingBlockstore<MemoryBlockstore>> =
+        Amt::load(&array_cid, &bs2).unwrap();
+    let mut retrieved_2: Vec<String> = Vec::new();
+    array
+        .for_range_while(500, 800, |_i, f| {
+            retrieved_2.push(f.clone());
+            Ok(true)
+        })
+        .unwrap();
+    println!("{:#?}", bs2.stats);
+    println!("{:#?} {:#?}", retrieved_2[0], retrieved_2.last());
+    assert_eq!(retrieved_2.len(), 300);
+
+    // assert that the new method reads less blocks
+    assert!(bs2.stats.borrow().r < bs1.stats.borrow().r);
+}
