@@ -439,17 +439,17 @@ where
                 for (i, v) in (0..).zip(vals.iter()) {
                     // filter out leaf values between start and end index
                     let idx = offset + i;
-                    if idx < start_index {
-                        continue;
-                    } else if idx >= end_index {
-                        return Ok(true);
-                    }
+                    match idx {
+                        _ if idx < start_index => continue,
+                        _ if idx >= end_index => return Ok(true),
+                        _ => {
+                            if let Some(v) = v {
+                                let keep_going = f(idx, v)?;
 
-                    if let Some(v) = v {
-                        let keep_going = f(idx, v)?;
-
-                        if !keep_going {
-                            return Ok(false);
+                                if !keep_going {
+                                    return Ok(false);
+                                }
+                            }
                         }
                     }
                 }
