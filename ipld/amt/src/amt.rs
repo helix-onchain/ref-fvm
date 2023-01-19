@@ -13,7 +13,7 @@ use fvm_ipld_encoding::CborStore;
 use itertools::sorted;
 
 use super::ValueMut;
-use crate::node::{CollapsedNode, IterationStats, Link};
+use crate::node::{CollapsedNode, Link};
 use crate::root::version::{Version as AmtVersion, V0, V3};
 use crate::root::RootImpl;
 use crate::{
@@ -185,12 +185,6 @@ where
         }
 
         while i >= nodes_for_height(self.bit_width(), self.height() + 1) {
-            // FIXME: remove debugging
-            let bit_width = self.bit_width();
-            let height = self.height();
-            let nodes_for_height = nodes_for_height(bit_width, height + 1);
-            println!("Amt setting {i:?}. nodes_for_height({bit_width:?}, {height:?} + 1) = {nodes_for_height:?})");
-
             // node at index exists
             if !self.root.node.is_empty() {
                 // Parent node for expansion
@@ -382,7 +376,7 @@ where
         mut f: F,
     ) -> Result<(), Error>
     where
-        F: FnMut(u64, &V, IterationStats) -> anyhow::Result<bool>,
+        F: FnMut(u64, &V) -> anyhow::Result<bool>,
     {
         self.root
             .node

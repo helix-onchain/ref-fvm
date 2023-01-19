@@ -16,11 +16,6 @@ use serde::{ser, Deserialize, Serialize};
 use super::ValueMut;
 use crate::{bmap_bytes, init_sized_vec, nodes_for_height, Error};
 
-#[derive(Debug)]
-pub struct IterationStats {
-    pub height: u32,
-}
-
 /// This represents a link to another Node
 #[derive(Debug)]
 pub enum Link<V> {
@@ -294,9 +289,6 @@ where
         // If dividing by nodes for height should give an index for link in node
         let idx: usize = (i / nfh).try_into().expect("index overflow");
 
-        // FIMXE: remove debugging
-        println!("Node setting {i:?}. nodes_for_height({bit_width:?}, {height:?})  = {nfh:?})");
-
         if let Node::Link { links } = self {
             links[idx] = match &mut links[idx] {
                 Some(Link::Cid { cid, cache }) => {
@@ -340,8 +332,6 @@ where
     }
 
     fn set_leaf(&mut self, i: u64, val: V) -> Option<V> {
-        // FIXME: remove debugging
-        println!("Leaf setting {i:?}");
         match self {
             Node::Leaf { vals } => {
                 let prev = std::mem::replace(
@@ -441,7 +431,7 @@ where
         f: &mut F,
     ) -> Result<bool, Error>
     where
-        F: FnMut(u64, &V, IterationStats) -> anyhow::Result<bool>,
+        F: FnMut(u64, &V) -> anyhow::Result<bool>,
         S: Blockstore,
     {
         match self {
@@ -456,7 +446,7 @@ where
                     }
 
                     if let Some(v) = v {
-                        let keep_going = f(idx, v, IterationStats { height })?;
+                        let keep_going = f(idx, v)?;
 
                         if !keep_going {
                             return Ok(false);
@@ -470,12 +460,10 @@ where
                     let high_limit = offset + (i + 1) * nfh;
                     // highest possible value the subtree contains is less than start_index
                     if start_index >= high_limit {
-                        println!("Skipping too low");
                         continue;
                     }
                     // end_index is exceeded by lowest value in the subtree
                     if end_index < offset + i * nfh {
-                        println!("Ending too high");
                         return Ok(true);
                     }
 

@@ -474,3 +474,21 @@ fn new_from_iter() {
     let expected: Vec<_> = data.into_iter().enumerate().collect();
     assert_eq!(expected, restored);
 }
+
+#[test]
+fn ranged_iteration() {
+    let mem = MemoryBlockstore::default();
+    let data: Vec<String> = (0..1000).map(|i| format!("thing{i}")).collect();
+    let k = Amt::<&str, _>::new_from_iter(&mem, data.iter().map(|s| &**s)).unwrap();
+
+    let a: Amt<String, _> = Amt::load(&k, &mem).unwrap();
+    let mut restored = Vec::new();
+    a.for_range_while(100, 200, |k, v| {
+        restored.push((k as usize, v.clone()));
+        Ok(true)
+    })
+    .unwrap();
+
+    let expected: Vec<(usize, String)> = (100..200).map(|i| (i, format!("thing{i}"))).collect();
+    assert_eq!(expected, restored);
+}
