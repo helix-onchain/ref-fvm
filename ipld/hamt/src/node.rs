@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -524,12 +525,13 @@ where
         S: Blockstore,
     {
         let mut values_traversed = 0;
+        let mut last_path = curr_path.clone();
 
         for (branch, p) in (0_u8..).zip(&self.pointers) {
             let new_path = curr_path.create_branch(branch);
 
             if values_traversed >= limit {
-                return Ok((values_traversed, new_path));
+                return Ok((values_traversed, last_path));
             }
 
             if new_path.can_skip(start_at) {
@@ -539,16 +541,17 @@ where
             match p {
                 Pointer::Link { cid, cache } => {
                     if let Some(cached_node) = cache.get() {
-                        values_traversed += cached_node
-                            .for_each_while(
-                                store,
-                                start_at,
-                                new_path,
-                                limit - values_traversed,
-                                conf,
-                                f,
-                            )?
-                            .0;
+                        let (traversed, next_path) = cached_node.for_each_while(
+                            store,
+                            start_at,
+                            new_path,
+                            limit - values_traversed,
+                            conf,
+                            f,
+                        )?;
+
+                        values_traversed += traversed;
+                        last_path = next_path.clone();
                     } else {
                         let node = if let Some(node) = store.get_cbor(cid)? {
                             node
@@ -562,51 +565,48 @@ where
 
                         // Ignore error intentionally, the cache value will always be the same
                         let cache_node = cache.get_or_init(|| node);
-                        // TODO: fix params
-                        values_traversed += cache_node
-                            .for_each_while(
-                                store,
-                                start_at,
-                                new_path,
-                                limit - values_traversed,
-                                conf,
-                                f,
-                            )?
-                            .0;
-                    }
-                }
-                Pointer::Dirty(node) => {
-                    // TODO: fix params
-                    values_traversed += node
-                        .for_each_while(
+                        let (traversed, next_path) = cache_node.for_each_while(
                             store,
                             start_at,
                             new_path,
                             limit - values_traversed,
                             conf,
                             f,
-                        )?
-                        .0;
+                        )?;
+                        values_traversed += traversed;
+                        last_path = next_path.clone();
+                    }
+                }
+                Pointer::Dirty(node) => {
+                    let (traversed, next_path) = node.for_each_while(
+                        store,
+                        start_at,
+                        new_path,
+                        limit - values_traversed,
+                        conf,
+                        f,
+                    )?;
+                    values_traversed += traversed;
+                    last_path = next_path.clone();
                 }
                 Pointer::Values(kvs) => {
                     let mut val_count = 0;
                     for kv in kvs {
                         let leaf_path = new_path.create_branch(val_count);
 
-                        if leaf_path.can_skip(start_at) {
+                        if leaf_path.cmp(start_at) != Ordering::Greater {
                             val_count += 1;
                             continue;
                         }
 
                         // stop if over limit
                         if values_traversed >= limit {
-                            println!("Here 1");
-                            return Ok((values_traversed, leaf_path));
+                            return Ok((values_traversed, last_path));
                         }
 
                         f(kv.0.borrow(), kv.1.borrow())?;
-                        println!("{:?}", leaf_path);
 
+                        last_path = leaf_path;
                         values_traversed += 1;
                         val_count += 1;
                     }
@@ -614,8 +614,7 @@ where
             }
         }
 
-        // TODO: maybe this should be a sentinel value indicating the entire tree has been explored
-        println!("here 3? {:?}", curr_path);
-        Ok((values_traversed, curr_path))
+        // this branch was fully explored, so return the next path (uncle)
+        Ok((values_traversed, last_path))
     }
 }

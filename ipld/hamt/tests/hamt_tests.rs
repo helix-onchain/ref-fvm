@@ -2,6 +2,7 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::vec;
@@ -387,6 +388,47 @@ fn for_each(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidChecker) 
     }
 }
 
+fn for_each_while(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidChecker) {
+    let mem = MemoryBlockstore::default();
+    let store = TrackingBlockstore::new(&mem);
+
+    let mut hamt: Hamt<_, u64> = factory.new_with_bit_width(&store, 2);
+
+    const N_VALUES: u64 = 200;
+    for i in 0..N_VALUES {
+        hamt.set(tstring(i), i).unwrap();
+    }
+
+    for target_num in 0..N_VALUES {
+        let mut results = HashSet::new();
+
+        // add the first `target_num` values
+        let (num_traversed, next_range_start) = hamt
+            .for_each_while(&Path::default(), target_num, |_k, v| {
+                results.insert(*v);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(num_traversed, target_num);
+        assert_eq!(results.len(), target_num as usize);
+
+        // add the next `target_num` values
+        let (num_traversed, _) = hamt
+            .for_each_while(&next_range_start, target_num, |_k, v| {
+                results.insert(*v);
+                Ok(())
+            })
+            .unwrap();
+
+        // num_traversed the second time should be the number of values left or the requested number
+        // of values, whichever is smaller
+        assert_eq!(num_traversed, min(N_VALUES - target_num, target_num));
+        // the total number of values traversed should be the number of values requested * 2 or the
+        // total number of values, whichever is smaller
+        assert_eq!(results.len(), min(N_VALUES, target_num * 2) as usize);
+    }
+}
+
 #[cfg(feature = "identity")]
 fn add_and_remove_keys(
     bit_width: u32,
@@ -731,56 +773,11 @@ fn tstring(v: impl Display) -> BytesKey {
     BytesKey(v.to_string().into_bytes())
 }
 
-fn for_each_while(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidChecker) {
-    let mem = MemoryBlockstore::default();
-    let store = TrackingBlockstore::new(&mem);
-
-    let mut hamt: Hamt<_, u64> = factory.new_with_bit_width(&store, 2);
-
-    const N_VALUES: u64 = 200;
-    for i in 0..N_VALUES {
-        hamt.set(tstring(i), i).unwrap();
-    }
-
-    let mut results = vec![];
-    let target_num = 150;
-    let (num_traversed, next_range_start) = hamt
-        .for_each_while(&Path::default(), target_num, |_k, v| {
-            results.push(*v);
-            Ok(())
-        })
-        .unwrap();
-    println!("len: {:?}, results: {:?}", results.len(), results);
-    assert_eq!(num_traversed, target_num);
-    assert_eq!(results.len(), target_num as usize);
-
-    println!();
-    println!("next_range_start: {:?}", next_range_start);
-    println!();
-
-    let (num_traversed, _) = hamt
-        .for_each_while(&next_range_start, target_num, |_k, v| {
-            results.push(*v);
-            Ok(())
-        })
-        .unwrap();
-    println!("len: {:?}, results: {:?}", results.len(), results);
-    assert_eq!(num_traversed, N_VALUES - target_num);
-    assert_eq!(results.len(), N_VALUES as usize);
-}
-
 mod test_default {
     use fvm_ipld_blockstore::tracking::BSStats;
     use quickcheck_macros::quickcheck;
 
     use crate::{CidChecker, HamtFactory, LimitedKeyOps, UniqueKeyValuePairs};
-
-    #[test]
-    fn for_each_while() {
-        #[rustfmt::skip]
-        let cids = CidChecker::new(vec![]);
-        super::for_each_while(HamtFactory::default(), None, cids);
-    }
 
     #[test]
     fn test_basics() {
@@ -867,6 +864,13 @@ mod test_default {
             "bafy2bzaceczhz54xmmz3xqnbmvxfbaty3qprr6dq7xh5vzwqbirlsnbd36z7a",
         ]);
         super::for_each(HamtFactory::default(), Some(stats), cids);
+    }
+
+    #[test]
+    fn for_each_while() {
+        #[rustfmt::skip]
+        let cids = CidChecker::new(vec![]);
+        super::for_each_while(HamtFactory::default(), None, cids);
     }
 
     #[test]

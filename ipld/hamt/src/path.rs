@@ -30,7 +30,11 @@ impl PartialOrd for Path {
 
         // we explored the entire path and it matched, therefore it is a direct ancestor or the
         // range start itself, and cannot be skipped
-        Some(Ordering::Equal)
+        if self.branches.len() > other.branches.len() {
+            Some(Ordering::Greater)
+        } else {
+            Some(Ordering::Equal)
+        }
     }
 }
 
@@ -53,5 +57,21 @@ impl Path {
     // the path specified by `range_start` can be ignored.
     pub fn can_skip(&self, range_start: &Path) -> bool {
         self.cmp(range_start) == Ordering::Less
+    }
+
+    // Returns the next uncle path
+    // FIXME: this may not be a valid path (i.e. when the branch number exceeds the bitfield length,
+    // in these cases, unecessary nodes will be explored on the next iteration)
+    // FIMXE: when the parent is branch number 255_u8, this will break
+    pub fn next_uncle(&self) -> Path {
+        if self.branches.len() <= 1 {
+            return Path::default();
+        }
+        let mut new_vec = self.branches.clone();
+        new_vec.pop();
+
+        let parent = new_vec.pop().unwrap();
+        new_vec.push(parent + 1);
+        Path { branches: new_vec }
     }
 }
