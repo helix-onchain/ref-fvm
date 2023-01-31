@@ -517,7 +517,6 @@ where
         start_at: &Path,
         curr_path: Path,
         limit: u64,
-        conf: &Config,
         f: &mut F,
     ) -> Result<(u64, Path), Error>
     where
@@ -546,7 +545,6 @@ where
                             start_at,
                             new_path,
                             limit - values_traversed,
-                            conf,
                             f,
                         )?;
 
@@ -570,7 +568,6 @@ where
                             start_at,
                             new_path,
                             limit - values_traversed,
-                            conf,
                             f,
                         )?;
                         values_traversed += traversed;
@@ -583,7 +580,6 @@ where
                         start_at,
                         new_path,
                         limit - values_traversed,
-                        conf,
                         f,
                     )?;
                     values_traversed += traversed;

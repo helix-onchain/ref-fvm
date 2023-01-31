@@ -374,13 +374,11 @@ where
         V: DeserializeOwned,
         F: FnMut(&K, &V) -> anyhow::Result<()>,
     {
-        // TODO: use start passed in from outside
         self.root.for_each_while(
             self.store.borrow(),
             start_at,
             Path::default(),
             limit,
-            &self.conf,
             &mut f,
         )
     }
