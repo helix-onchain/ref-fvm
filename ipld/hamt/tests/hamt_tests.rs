@@ -104,11 +104,11 @@ impl CidChecker {
         }
     }
 
-    pub fn check_next(&mut self, _cid: Cid) {
-        if let Some(_cids) = &self.cids {
-            // assert_ne!(self.checked, cids.len());
-            // assert_eq!(cid.to_string().as_str(), cids[self.checked]);
-            // self.checked += 1;
+    pub fn check_next(&mut self, cid: Cid) {
+        if let Some(cids) = &self.cids {
+            assert_ne!(self.checked, cids.len());
+            assert_eq!(cid.to_string().as_str(), cids[self.checked]);
+            self.checked += 1;
         }
     }
 }
@@ -426,6 +426,13 @@ fn for_each_while(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidChe
         // the total number of values traversed should be the number of values requested * 2 or the
         // total number of values, whichever is smaller
         assert_eq!(results.len(), min(N_VALUES, target_num * 2) as usize);
+    }
+
+    let c = hamt.flush().unwrap();
+    cids.check_next(c);
+
+    if let Some(stats) = stats {
+        assert_eq!(*store.stats.borrow(), stats);
     }
 }
 
@@ -869,8 +876,11 @@ mod test_default {
     #[test]
     fn for_each_while() {
         #[rustfmt::skip]
-        let cids = CidChecker::new(vec![]);
-        super::for_each_while(HamtFactory::default(), None, cids);
+        let stats = BSStats {r: 0, w: 47, br: 0, bw: 3545};
+        let cids = CidChecker::new(vec![
+            "bafy2bzacedj2tu3hkyta6yju4rwxw5w5emwcjfhtkwrlutz3myypjpu7qg4bu",
+        ]);
+        super::for_each_while(HamtFactory::default(), Some(stats), cids);
     }
 
     #[test]
