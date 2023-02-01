@@ -162,7 +162,7 @@ where
             return Err(Error::ZeroPageSize);
         }
 
-        let mut count_traversed = 0;
+        let mut traversed_count = 0;
 
         for (branch, p) in (0_u8..).zip(&self.pointers) {
             let new_pos = curr_pos.create_branch(branch);
@@ -177,13 +177,13 @@ where
                             store,
                             start_at,
                             new_pos,
-                            limit.map(|l| l - count_traversed),
+                            limit.map(|l| l - traversed_count),
                             f,
                         )?;
 
-                        count_traversed += traversed;
-                        if limit.is_some() && count_traversed >= limit.unwrap() {
-                            return Ok((count_traversed, last_traversed));
+                        traversed_count += traversed;
+                        if limit.is_some() && traversed_count >= limit.unwrap() {
+                            return Ok((traversed_count, last_traversed));
                         }
                     } else {
                         let node = if let Some(node) = store.get_cbor(cid)? {
@@ -202,12 +202,12 @@ where
                             store,
                             start_at,
                             new_pos,
-                            limit.map(|l| l - count_traversed),
+                            limit.map(|l| l - traversed_count),
                             f,
                         )?;
-                        count_traversed += traversed;
-                        if limit.is_some() && count_traversed >= limit.unwrap() {
-                            return Ok((count_traversed, last_traversed));
+                        traversed_count += traversed;
+                        if limit.is_some() && traversed_count >= limit.unwrap() {
+                            return Ok((traversed_count, last_traversed));
                         }
                     }
                 }
@@ -216,12 +216,12 @@ where
                         store,
                         start_at,
                         new_pos,
-                        limit.map(|l| l - count_traversed),
+                        limit.map(|l| l - traversed_count),
                         f,
                     )?;
-                    count_traversed += traversed;
-                    if limit.is_some() && count_traversed >= limit.unwrap() {
-                        return Ok((count_traversed, last_traversed));
+                    traversed_count += traversed;
+                    if limit.is_some() && traversed_count >= limit.unwrap() {
+                        return Ok((traversed_count, last_traversed));
                     }
                 }
                 Pointer::Values(kvs) => {
@@ -234,9 +234,9 @@ where
 
                         f(kv.0.borrow(), kv.1.borrow())?;
 
-                        count_traversed += 1;
-                        if limit.is_some() && count_traversed >= limit.unwrap() {
-                            return Ok((count_traversed, Some(leaf_path)));
+                        traversed_count += 1;
+                        if limit.is_some() && traversed_count >= limit.unwrap() {
+                            return Ok((traversed_count, Some(leaf_path)));
                         }
                     }
                 }
@@ -244,7 +244,7 @@ where
         }
 
         // Finished iteration, therefore there are no more values to traverse
-        Ok((count_traversed, None))
+        Ok((traversed_count, None))
     }
 
     /// Search for a key.
