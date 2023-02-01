@@ -146,7 +146,7 @@ where
     /// Returns a tuple `(u64, Option<Path>)` indicating the number of values traversed and the a
     /// cursor to the last value that was traversed. If the last path traversed is `None`, it
     /// indicates that there are no more values in the HAMT.
-    pub(crate) fn for_each_range<S, F>(
+    pub(crate) fn for_each<S, F>(
         &self,
         store: &S,
         start_at: Option<&LeafCursor>,
@@ -173,7 +173,7 @@ where
             match p {
                 Pointer::Link { cid, cache } => {
                     if let Some(cached_node) = cache.get() {
-                        let (traversed, last_traversed) = cached_node.for_each_range(
+                        let (traversed, last_traversed) = cached_node.for_each(
                             store,
                             start_at,
                             new_pos,
@@ -198,7 +198,7 @@ where
 
                         // Ignore error intentionally, the cache value will always be the same
                         let cache_node = cache.get_or_init(|| node);
-                        let (traversed, last_traversed) = cache_node.for_each_range(
+                        let (traversed, last_traversed) = cache_node.for_each(
                             store,
                             start_at,
                             new_pos,
@@ -212,7 +212,7 @@ where
                     }
                 }
                 Pointer::Dirty(node) => {
-                    let (traversed, last_traversed) = node.for_each_range(
+                    let (traversed, last_traversed) = node.for_each(
                         store,
                         start_at,
                         new_pos,
