@@ -10,7 +10,7 @@ pub(crate) struct Path(pub(crate) Vec<u8>);
 
 /// A NodeCursor points to a non-leaf node in the trie that is reached by following the specified path
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
-pub struct NodeCursor {
+pub(crate) struct NodeCursor {
     cid: Cid,
     path: Path,
 }
