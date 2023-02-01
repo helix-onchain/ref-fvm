@@ -360,7 +360,7 @@ where
         V: DeserializeOwned,
         F: FnMut(&K, &V) -> anyhow::Result<()>,
     {
-        self.root.for_each_while(
+        self.root.for_each_range(
             self.store.borrow(),
             None,
             NodeCursor::default(),
@@ -381,7 +381,7 @@ where
         V: DeserializeOwned,
         F: FnMut(&K, &V) -> anyhow::Result<()>,
     {
-        self.root.for_each_while(
+        self.root.for_each_range(
             self.store.borrow(),
             start_at.as_ref(),
             NodeCursor::default(),
