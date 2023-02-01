@@ -4,16 +4,18 @@
 
 use cid::Cid;
 
-/// A path is specified as a sequence of branches
+/// A Path is specified as a sequence of branches taken at each level of traversal
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Path(pub(crate) Vec<u8>);
 
+/// A NodeCursor points to a non-leaf node in the trie that is reached by following the specified path
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub struct NodeCursor {
     cid: Cid,
     path: Path,
 }
 
+/// A LeafCursor points to a leaf node in the trie that is reached by following the specified path
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub struct LeafCursor {
     cid: Cid,

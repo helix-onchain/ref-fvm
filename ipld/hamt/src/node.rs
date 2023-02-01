@@ -139,7 +139,8 @@ where
     }
 
     /// Returns a tuple `(u64, Option<Path>)` indicating the number of values traversed and the path of the
-    /// last item that was traversed. If the last path traversed is `None`, then no more items were found.
+    /// last item that was traversed. If the last path traversed is `None`, then the HAMT iteration has
+    /// been exhausted.
     pub(crate) fn for_each_while<S, F>(
         &self,
         store: &S,
