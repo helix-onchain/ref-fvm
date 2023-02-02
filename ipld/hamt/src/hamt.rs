@@ -384,6 +384,7 @@ where
     ///
     /// ```
     /// use fvm_ipld_hamt::Hamt;
+    /// use fvm_ipld_hamt::RangeStart;
     ///
     /// let store = fvm_ipld_blockstore::MemoryBlockstore::default();
     ///
