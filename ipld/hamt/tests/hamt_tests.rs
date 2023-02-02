@@ -394,11 +394,19 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
 
     let mut hamt: Hamt<_, u64> = factory.new_with_bit_width(&store, 2);
 
+    // First, create a HAMT with N_VALUES many entries
     const N_VALUES: u64 = 200;
     for i in 0..N_VALUES {
         hamt.set(tstring(i), i).unwrap();
     }
 
+    // For each target_number less than N_VALUES attempt to retrieve two pages of data from the HAMT
+    // The first iteration should retrieve the first `target_num` values
+    // The second iteration should retrieve the next `target_num` values using the cursor returned
+    // from the first iteration. The second request may exceed the number of values left in the HAMT,
+    // it should only retrieve as many values as are left at max.
+    // Both iterations add their results to a HashSet to assert that no values are duplicated
+    // demonstrating that non-overlapping pages were returned.
     for target_num in 1..N_VALUES {
         let mut results = HashSet::new();
 
@@ -433,6 +441,18 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
             assert!(next_range_start.is_none());
         }
     }
+
+    let mut results = HashSet::new();
+    // Requesting more values than exist in the HAMT should return all values and an empty cursor
+    let (num_traversed, next_range_start) = hamt
+        .for_each_ranged(&LeafCursor::start(Cid::default()), 500, |_k, v| {
+            results.insert(*v);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(num_traversed, N_VALUES);
+    assert_eq!(results.len(), N_VALUES as usize);
+    assert!(next_range_start.is_none());
 
     let c = hamt.flush().unwrap();
     cids.check_next(c);
