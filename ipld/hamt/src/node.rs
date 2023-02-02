@@ -149,7 +149,7 @@ where
     pub(crate) fn for_each<S, F>(
         &self,
         store: &S,
-        start_at: Option<&LeafCursor>,
+        start_at: &LeafCursor,
         curr_pos: NodeCursor,
         limit: Option<u64>,
         f: &mut F,
@@ -166,7 +166,7 @@ where
 
         for (branch, p) in (0_u8..).zip(&self.pointers) {
             let new_pos = curr_pos.create_branch(branch);
-            if start_at.is_some() && new_pos.can_skip(start_at.unwrap()) {
+            if new_pos.can_skip(start_at) {
                 continue;
             }
 
@@ -182,7 +182,7 @@ where
                         )?;
 
                         traversed_count += traversed;
-                        if limit.is_some() && traversed_count >= limit.unwrap() {
+                        if limit.map_or(false, |limit| traversed_count >= limit) {
                             return Ok((traversed_count, last_traversed));
                         }
                     } else {
@@ -206,7 +206,7 @@ where
                             f,
                         )?;
                         traversed_count += traversed;
-                        if limit.is_some() && traversed_count >= limit.unwrap() {
+                        if limit.map_or(false, |limit| traversed_count >= limit) {
                             return Ok((traversed_count, last_traversed));
                         }
                     }
@@ -220,7 +220,7 @@ where
                         f,
                     )?;
                     traversed_count += traversed;
-                    if limit.is_some() && traversed_count >= limit.unwrap() {
+                    if limit.map_or(false, |limit| traversed_count >= limit) {
                         return Ok((traversed_count, last_traversed));
                     }
                 }
@@ -228,14 +228,14 @@ where
                     for (branch, kv) in (0_u8..).zip(kvs) {
                         // leaf branches must be strictly greater than the start_at cursor
                         let leaf_path = new_pos.create_leaf(branch);
-                        if start_at.is_some() && leaf_path.can_skip(start_at.unwrap()) {
+                        if leaf_path.can_skip(start_at) {
                             continue;
                         }
 
                         f(kv.0.borrow(), kv.1.borrow())?;
 
                         traversed_count += 1;
-                        if limit.is_some() && traversed_count >= limit.unwrap() {
+                        if limit.map_or(false, |limit| traversed_count >= limit) {
                             return Ok((traversed_count, Some(leaf_path)));
                         }
                     }
