@@ -177,7 +177,7 @@ where
                             store,
                             start_at,
                             new_pos,
-                            limit.map(|l| l - traversed_count),
+                            limit.map(|l| l.checked_sub(traversed_count).unwrap()),
                             f,
                         )?;
 
@@ -202,7 +202,7 @@ where
                             store,
                             start_at,
                             new_pos,
-                            limit.map(|l| l - traversed_count),
+                            limit.map(|l| l.checked_sub(traversed_count).unwrap()),
                             f,
                         )?;
                         traversed_count += traversed;
@@ -216,7 +216,7 @@ where
                         store,
                         start_at,
                         new_pos,
-                        limit.map(|l| l - traversed_count),
+                        limit.map(|l| l.checked_sub(traversed_count).unwrap()),
                         f,
                     )?;
                     traversed_count += traversed;
