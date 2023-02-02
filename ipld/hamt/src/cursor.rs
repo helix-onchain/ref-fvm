@@ -11,16 +11,22 @@ pub(crate) struct Path(pub(crate) Vec<u8>);
 /// a trie at the `root` cid
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub(crate) struct NodeCursor {
-    root: Cid,
     path: Path,
 }
 
 /// A LeafCursor points to a leaf node reached by following the specified path from the root of a
 /// trie at the `root` cid
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub struct LeafCursor {
-    root: Cid,
     path: Path,
+}
+
+/// A RangeStart is a LeafCursor that also specifies the root of the trie. It contains a cid of the
+/// root of the trie that it is valid for.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum RangeStart {
+    Root,
+    Leaf { cursor: LeafCursor, hamt_root: Cid },
 }
 
 /// BranchOrdering is the result of comparing two `Branches` in a tree-like where each represents a
@@ -73,10 +79,7 @@ impl NodeCursor {
     pub fn create_leaf(&self, branch: u8) -> LeafCursor {
         let mut new_path = self.path.clone();
         new_path.0.push(branch);
-        LeafCursor {
-            root: self.root,
-            path: new_path,
-        }
+        LeafCursor { path: new_path }
     }
 
     /// Returns true if this branch can be safely skipped, given the specified `range_start`.
@@ -96,9 +99,8 @@ impl NodeCursor {
 impl LeafCursor {
     /// Creates a new empty pseudo-LeafCursor that acts to specify the root of the trie. This is
     /// used as `range_start` in cases where iteration should start from the beginning of the trie.
-    pub fn start(root: Cid) -> LeafCursor {
+    pub fn new() -> LeafCursor {
         LeafCursor {
-            root,
             path: Path::default(),
         }
     }
@@ -114,5 +116,11 @@ impl LeafCursor {
             BranchOrdering::Ancestor => false,
             BranchOrdering::Descendant => false,
         }
+    }
+}
+
+impl RangeStart {
+    pub fn root() -> RangeStart {
+        RangeStart::Root
     }
 }

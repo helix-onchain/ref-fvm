@@ -15,7 +15,7 @@ use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_ipld_encoding::CborStore;
 #[cfg(feature = "identity")]
 use fvm_ipld_hamt::Identity;
-use fvm_ipld_hamt::{BytesKey, Config, Error, Hamt, Hash, LeafCursor};
+use fvm_ipld_hamt::{BytesKey, Config, Error, Hamt, Hash, RangeStart};
 use multihash::Code;
 use quickcheck::Arbitrary;
 use rand::seq::SliceRandom;
@@ -412,7 +412,7 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
 
         // add the first `target_num` values
         let (num_traversed, next_range_start) = hamt
-            .for_each_ranged(&LeafCursor::start(Cid::default()), target_num, |_k, v| {
+            .for_each_ranged(&RangeStart::root(), target_num, |_k, v| {
                 results.insert(*v);
                 Ok(())
             })
@@ -445,7 +445,7 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
     let mut results = HashSet::new();
     // Requesting more values than exist in the HAMT should return all values and an empty cursor
     let (num_traversed, next_range_start) = hamt
-        .for_each_ranged(&LeafCursor::start(Cid::default()), 500, |_k, v| {
+        .for_each_ranged(&RangeStart::root(), 500, |_k, v| {
             results.insert(*v);
             Ok(())
         })
@@ -453,6 +453,29 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
     assert_eq!(num_traversed, N_VALUES);
     assert_eq!(results.len(), N_VALUES as usize);
     assert!(next_range_start.is_none());
+
+    // Modifying the HAMT between two iterations should fail as the cursor is now stale
+    let (_, next_range_start) = hamt
+        .for_each_ranged(&RangeStart::root(), 100, |_k, v| {
+            results.insert(*v);
+            Ok(())
+        })
+        .unwrap();
+    // Add a new value to the HAMT
+    hamt.set(tstring(1000), 1000).unwrap();
+
+    // Attempt to continue iterating from the previous cursor
+    let err = hamt
+        .for_each_ranged(&next_range_start.unwrap(), 100, |_k, v| {
+            results.insert(*v);
+            Ok(())
+        })
+        .unwrap_err();
+    if let Error::StaleCursor(_cid) = err {
+        // expected
+    } else {
+        panic!("unexpected error: {:?}", err);
+    }
 
     let c = hamt.flush().unwrap();
     cids.check_next(c);
@@ -902,9 +925,9 @@ mod test_default {
     #[test]
     fn for_each_ranged() {
         #[rustfmt::skip]
-        let stats = BSStats {r: 0, w: 47, br: 0, bw: 3545};
+        let stats = BSStats {r: 0, w: 51, br: 0, bw: 4080};
         let cids = CidChecker::new(vec![
-            "bafy2bzacedj2tu3hkyta6yju4rwxw5w5emwcjfhtkwrlutz3myypjpu7qg4bu",
+            "bafy2bzacedisklonkhj3wv2u3mn6dr6o2w5khyabhuec6dspc7ry2szk35fhq",
         ]);
         super::for_each_ranged(HamtFactory::default(), Some(stats), cids);
     }

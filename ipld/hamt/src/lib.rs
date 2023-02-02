@@ -20,7 +20,7 @@ mod hash_bits;
 mod node;
 mod pointer;
 
-pub use cursor::LeafCursor;
+pub use cursor::{LeafCursor, RangeStart};
 pub use forest_hash_utils::{BytesKey, Hash};
 use serde::{Deserialize, Serialize};
 

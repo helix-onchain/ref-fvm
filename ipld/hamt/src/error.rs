@@ -25,6 +25,9 @@ pub enum Error {
     /// Zero page size error
     #[error("Requested page size must be more than 0")]
     ZeroPageSize,
+    /// Attempting to iterate from a stale cursor
+    #[error("Attempted to iterate from a stale cursor: {0}")]
+    StaleCursor(String),
     /// Dynamic error for when the error needs to be forwarded as is.
     #[error("{0}")]
     Dynamic(anyhow::Error),

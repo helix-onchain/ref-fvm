@@ -13,7 +13,7 @@ use multihash::Code;
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
 
-use crate::cursor::{LeafCursor, NodeCursor};
+use crate::cursor::{LeafCursor, NodeCursor, RangeStart};
 use crate::node::Node;
 use crate::{Config, Error, Hash, HashAlgorithm, Sha256};
 
@@ -362,7 +362,7 @@ where
     {
         self.root.for_each(
             self.store.borrow(),
-            &LeafCursor::start(Cid::default()),
+            &LeafCursor::new(),
             NodeCursor::default(),
             None,
             &mut f,
@@ -370,24 +370,76 @@ where
         Ok(())
     }
 
+    /// Iterates over each KV in the Hamt and runs a function on the values. The is paginated and
+    /// will from a cursor position specified by `start_at` and return `limit` number of values
+    /// unless all values in the HAMT are exhausted.
+    ///
+    /// This function will constrain all values to be of the same type
+    ///
+    /// The function returns the number of items iterated over and if there are values left, a cursor
+    /// to be passed into the next call of `for_each_ranged` to resume iteration.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use fvm_ipld_hamt::Hamt;
+    ///
+    /// let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+    ///
+    /// let mut map: Hamt<_, _, usize> = Hamt::new(store);
+    /// map.set(1, 1).unwrap();
+    /// map.set(4, 2).unwrap();
+    ///
+    /// let mut total = 0;
+    /// map.for_each_ranged(&RangeStart::root(), 1, |_, v: &u64| {
+    ///    total += v;
+    ///    Ok(())
+    /// }).unwrap();
+    /// assert_eq!(total, 1);
+    /// ```
     #[inline]
     pub fn for_each_ranged<F>(
-        &self,
-        start_at: &LeafCursor,
+        &mut self,
+        start_at: &RangeStart,
         limit: u64,
         mut f: F,
-    ) -> Result<(u64, Option<LeafCursor>), Error>
+    ) -> Result<(u64, Option<RangeStart>), Error>
     where
         V: DeserializeOwned,
         F: FnMut(&K, &V) -> anyhow::Result<()>,
     {
-        self.root.for_each(
-            self.store.borrow(),
-            start_at,
-            NodeCursor::default(),
-            Some(limit),
-            &mut f,
-        )
+        let cid = self.flush()?;
+
+        let (n_traversed, leaf_cursor) = match start_at {
+            RangeStart::Root => self.root.for_each(
+                self.store.borrow(),
+                &LeafCursor::new(),
+                NodeCursor::default(),
+                Some(limit),
+                &mut f,
+            )?,
+            RangeStart::Leaf { cursor, hamt_root } => {
+                if cid != *hamt_root {
+                    return Err(Error::StaleCursor(hamt_root.to_string()));
+                }
+                self.root.for_each(
+                    self.store.borrow(),
+                    cursor,
+                    NodeCursor::default(),
+                    Some(limit),
+                    &mut f,
+                )?
+            }
+        };
+
+        Ok((
+            n_traversed,
+            leaf_cursor.map(|cursor| RangeStart::Leaf {
+                cursor,
+                hamt_root: cid,
+            }),
+        ))
     }
 
     /// Consumes this HAMT and returns the Blockstore it owns.
