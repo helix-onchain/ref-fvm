@@ -362,7 +362,7 @@ where
     {
         self.root.for_each(
             self.store.borrow(),
-            None,
+            &LeafCursor::start(Cid::default()),
             NodeCursor::default(),
             None,
             &mut f,
@@ -373,7 +373,7 @@ where
     #[inline]
     pub fn for_each_ranged<F>(
         &self,
-        start_at: Option<LeafCursor>,
+        start_at: &LeafCursor,
         limit: u64,
         mut f: F,
     ) -> Result<(u64, Option<LeafCursor>), Error>
@@ -383,7 +383,7 @@ where
     {
         self.root.for_each(
             self.store.borrow(),
-            start_at.as_ref(),
+            start_at,
             NodeCursor::default(),
             Some(limit),
             &mut f,

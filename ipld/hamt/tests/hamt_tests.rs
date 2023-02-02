@@ -15,7 +15,7 @@ use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_ipld_encoding::CborStore;
 #[cfg(feature = "identity")]
 use fvm_ipld_hamt::Identity;
-use fvm_ipld_hamt::{BytesKey, Config, Error, Hamt, Hash};
+use fvm_ipld_hamt::{BytesKey, Config, Error, Hamt, Hash, LeafCursor};
 use multihash::Code;
 use quickcheck::Arbitrary;
 use rand::seq::SliceRandom;
@@ -404,7 +404,7 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
 
         // add the first `target_num` values
         let (num_traversed, next_range_start) = hamt
-            .for_each_ranged(None, target_num, |_k, v| {
+            .for_each_ranged(&LeafCursor::start(Cid::default()), target_num, |_k, v| {
                 results.insert(*v);
                 Ok(())
             })
@@ -412,26 +412,26 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
         assert_eq!(num_traversed, target_num);
         assert_eq!(results.len(), target_num as usize);
 
-        if target_num != N_VALUES {
+        if target_num <= N_VALUES {
             assert!(next_range_start.is_some());
+
+            // add the next `target_num` values
+            let (num_traversed, _) = hamt
+                .for_each_ranged(&next_range_start.unwrap(), target_num, |_k, v| {
+                    results.insert(*v);
+                    Ok(())
+                })
+                .unwrap();
+
+            // num_traversed the second time should be the number of values left or the requested number
+            // of values, whichever is smaller
+            assert_eq!(num_traversed, min(N_VALUES - target_num, target_num));
+            // the total number of values traversed should be the number of values requested * 2 or the
+            // total number of values, whichever is smaller
+            assert_eq!(results.len(), min(N_VALUES, target_num * 2) as usize);
         } else {
             assert!(next_range_start.is_none());
         }
-
-        // add the next `target_num` values
-        let (num_traversed, _) = hamt
-            .for_each_ranged(next_range_start, target_num, |_k, v| {
-                results.insert(*v);
-                Ok(())
-            })
-            .unwrap();
-
-        // num_traversed the second time should be the number of values left or the requested number
-        // of values, whichever is smaller
-        assert_eq!(num_traversed, min(N_VALUES - target_num, target_num));
-        // the total number of values traversed should be the number of values requested * 2 or the
-        // total number of values, whichever is smaller
-        assert_eq!(results.len(), min(N_VALUES, target_num * 2) as usize);
     }
 
     let c = hamt.flush().unwrap();
