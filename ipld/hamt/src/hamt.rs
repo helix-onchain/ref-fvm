@@ -13,6 +13,7 @@ use multihash::Code;
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
 
+use crate::cursor::{LeafCursor, NodeCursor};
 use crate::node::Node;
 use crate::{Config, Error, Hash, HashAlgorithm, Sha256};
 
@@ -359,7 +360,34 @@ where
         V: DeserializeOwned,
         F: FnMut(&K, &V) -> anyhow::Result<()>,
     {
-        self.root.for_each(self.store.borrow(), &mut f)
+        self.root.for_each(
+            self.store.borrow(),
+            &LeafCursor::start(Cid::default()),
+            NodeCursor::default(),
+            None,
+            &mut f,
+        )?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn for_each_ranged<F>(
+        &self,
+        start_at: &LeafCursor,
+        limit: u64,
+        mut f: F,
+    ) -> Result<(u64, Option<LeafCursor>), Error>
+    where
+        V: DeserializeOwned,
+        F: FnMut(&K, &V) -> anyhow::Result<()>,
+    {
+        self.root.for_each(
+            self.store.borrow(),
+            start_at,
+            NodeCursor::default(),
+            Some(limit),
+            &mut f,
+        )
     }
 
     /// Consumes this HAMT and returns the Blockstore it owns.
