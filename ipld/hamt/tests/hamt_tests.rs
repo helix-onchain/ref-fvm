@@ -412,7 +412,7 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
 
         // add the first `target_num` values
         let (num_traversed, next_range_start) = hamt
-            .for_each_ranged(&LeafCursor::start(Cid::default()), target_num, |_k, v| {
+            .for_each_ranged(&LeafCursor::start(), target_num, |_k, v| {
                 results.insert(*v);
                 Ok(())
             })
@@ -445,7 +445,7 @@ fn for_each_ranged(factory: HamtFactory, stats: Option<BSStats>, mut cids: CidCh
     let mut results = HashSet::new();
     // Requesting more values than exist in the HAMT should return all values and an empty cursor
     let (num_traversed, next_range_start) = hamt
-        .for_each_ranged(&LeafCursor::start(Cid::default()), 500, |_k, v| {
+        .for_each_ranged(&LeafCursor::start(), 500, |_k, v| {
             results.insert(*v);
             Ok(())
         })

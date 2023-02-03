@@ -1,8 +1,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::Cid;
-
 /// A Path is specified as a sequence of branches taken at each level of traversal
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Path(pub(crate) Vec<u8>);
@@ -11,7 +9,6 @@ pub(crate) struct Path(pub(crate) Vec<u8>);
 /// a trie at the `root` cid
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub(crate) struct NodeCursor {
-    root: Cid,
     path: Path,
 }
 
@@ -19,7 +16,6 @@ pub(crate) struct NodeCursor {
 /// trie at the `root` cid
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct LeafCursor {
-    root: Cid,
     path: Path,
 }
 
@@ -64,19 +60,16 @@ impl Path {
 impl NodeCursor {
     /// Creates a new cursor, extending the path by the specified `branch`
     pub fn create_branch(&self, branch: u8) -> NodeCursor {
-        let mut new_cursor = self.clone();
-        new_cursor.path.0.push(branch);
-        new_cursor
+        let mut new_path = self.path.clone();
+        new_path.0.push(branch);
+        NodeCursor { path: new_path }
     }
 
     /// Creates a leaf cursor, extending the path by the specified `branch`
     pub fn create_leaf(&self, branch: u8) -> LeafCursor {
         let mut new_path = self.path.clone();
         new_path.0.push(branch);
-        LeafCursor {
-            root: self.root,
-            path: new_path,
-        }
+        LeafCursor { path: new_path }
     }
 
     /// Returns true if this branch can be safely skipped, given the specified `range_start`.
@@ -96,9 +89,8 @@ impl NodeCursor {
 impl LeafCursor {
     /// Creates a new empty pseudo-LeafCursor that acts to specify the root of the trie. This is
     /// used as `range_start` in cases where iteration should start from the beginning of the trie.
-    pub fn start(root: Cid) -> LeafCursor {
+    pub fn start() -> LeafCursor {
         LeafCursor {
-            root,
             path: Path::default(),
         }
     }
