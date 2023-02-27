@@ -2649,6 +2649,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "fvm_ipld_bigfield"
+version = "0.0.1"
+dependencies = [
+ "arbitrary",
+ "cid",
+ "criterion",
+ "fvm_ipld_amt 0.5.1",
+ "fvm_ipld_bitfield 0.5.4",
+ "fvm_ipld_blockstore 0.1.1",
+ "fvm_ipld_encoding 0.3.3",
+ "fvm_ipld_hamt 0.6.1",
+ "gperftools",
+ "rand",
+ "rand_xorshift",
+ "serde",
+ "serde_json",
+ "serde_tuple",
+ "thiserror",
+ "unsigned-varint",
+]
+
+[[package]]
 name = "fvm_ipld_bitfield"
 version = "0.5.4"
 dependencies = [
